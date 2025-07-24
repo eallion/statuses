@@ -1,4 +1,5 @@
-# mastodon_statuses
+# Mastodon Statuses
+
 Use n8n to backup Mastodon statuses
 
 ### How to work
