@@ -1,107 +1,112 @@
 import requests
 import os
 from datetime import datetime
-import time
-import urllib.parse
+import html2text
 
-def fetch_and_save_mastodon_posts():
-    # 基础API URL
-    base_url = "https://[mastodon.instance]/api/v1/accounts/[account::id]/statuses"
+# 配置
+API_BASE_URL = "https://mastodn.local/api/v1/accounts/[ACCOUNT_ID]/statuses"
+ACCOUNT_ID = ""
+BACKUP_DIR = "mastodon_backup"
+
+def format_to_markdown(status):
+    """
+    将单个状态对象格式化为包含 YAML front matter 的 Markdown 字符串。
+    """
+    # 检查是否为回复
+    is_reply = status.get('in_reply_to_id') is not None
     
-    # 初始参数（首次请求不带max_id）
-    params = {
-        'limit': 40,
-        'exclude_replies': 'true',      # 排除回复
-        'exclude_reblogs': 'true'       # 排除转发
-    }
+    # 检查是否有媒体附件
+    media_attachments = status.get('media_attachments')
+    media_count = len(media_attachments) if media_attachments else 0
     
-    # 计数器
-    page = 1
-    total_statuses = 0
-    has_more = True  # 添加标志变量控制循环
+    # YAML front matter
+    markdown_content = "---\n"
+    markdown_content += f"id: {status['id']}\n"
+    markdown_content += f"date: {status['created_at']}\n"
+    markdown_content += f"reply: {str(is_reply).lower()}\n"
+    markdown_content += f"media_attachments: {media_count}\n"
+    markdown_content += "---\n\n"
     
-    while has_more:
-        # 构建请求URL
-        query_string = urllib.parse.urlencode(params)
-        url = f"{base_url}?{query_string}"
-        print(f"正在请求第 {page} 页: {url}")
-        
-        # 发送GET请求
-        try:
-            response = requests.get(url, timeout=10)
-        except Exception as e:
-            print(f"请求失败: {e}")
-            time.sleep(5)  # 等待后重试
-            continue
+    # HTML 内容转换为 Markdown
+    h = html2text.HTML2Text()
+    h.body_width = 0  # 避免换行，保持原始格式
+    content = h.handle(status.get('content', ''))
+    markdown_content += content + "\n"
+
+    # 媒体附件
+    if media_attachments:
+        for media in media_attachments:
+            # 确保 description 不是 None
+            description = media.get('description', '')
+            markdown_content += f"![{description}]({media['url']})\n"
             
-        if response.status_code != 200:
-            print(f"请求失败，状态码: {response.status_code}")
-            print(f"响应内容: {response.text[:200]}")
-            has_more = False
-            break
-            
+    return markdown_content
+
+def backup_statuses():
+    """
+    备份符合条件的 Mastodon 动态为 Markdown 文件。
+    """
+    next_url = f"{API_BASE_URL}?limit=40&exclude_reblogs=true"
+    processed_count = 0
+
+    while next_url:
+        print(f"正在请求: {next_url}")
         try:
+            response = requests.get(next_url)
+            response.raise_for_status()
             statuses = response.json()
-        except Exception as e:
-            print(f"解析JSON失败: {e}")
-            has_more = False
-            break
-            
-        # 如果没有数据，停止循环
-        if not statuses:
-            print("没有更多数据，停止请求")
-            has_more = False
-            break
-            
-        # 处理当前页的状态
-        count = 0
-        for status in statuses:
-            count += 1
-            # 解析日期
-            try:
-                created_at = datetime.strptime(status['created_at'], "%Y-%m-%dT%H:%M:%S.%fZ")
-                date_path = created_at.strftime("%Y/%m/%d")
-            except Exception as e:
-                print(f"解析日期失败: {e}")
-                continue
+
+            if not statuses:
+                break
+
+            for status in statuses:
+                # 过滤条件：不是转嘟
+                is_reblog = status.get('reblog') is not None
+                if is_reblog:
+                    continue
+
+                # 过滤条件：如果in_reply_to_id不为空，in_reply_to_account_id必须是自己
+                if status.get('in_reply_to_id') is not None and status.get('in_reply_to_account_id') != ACCOUNT_ID:
+                    continue
+
+                # 获取日期信息，用于创建目录
+                created_at = datetime.strptime(status['created_at'], '%Y-%m-%dT%H:%M:%S.%fZ')
+                year = created_at.strftime('%Y')
+                month = created_at.strftime('%m')
+                day = created_at.strftime('%d')
                 
-            # 创建目录
-            os.makedirs(date_path, exist_ok=True)
-            
-            # 文件路径
-            file_path = os.path.join(date_path, f"{status['id']}.md")
-            
-            # 构建内容
-            content = status['content']
-            
-            # 处理媒体附件
-            media_attachments = status.get('media_attachments', [])
-            for media in media_attachments:
-                if media['type'] == 'image':
-                    image_url = media['url']
-                    content += f"\n![]({image_url})"
-            
-            # 写入文件
-            try:
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"已保存: {file_path}")
-            except Exception as e:
-                print(f"写入文件失败: {e}")
-        
-        total_statuses += count
-        print(f"第 {page} 页处理完成: {count} 条状态, 总计: {total_statuses} 条")
-        
-        # 更新max_id为当前页最后一条的id（用于下一页请求）
-        if statuses:  # 确保有数据
-            last_id = statuses[-1]['id']
-            params['max_id'] = last_id  # 设置max_id用于下次请求
-        
-        page += 1
-        
-        # 添加延迟以避免请求过快
-        time.sleep(1)
+                # 创建文件路径
+                dir_path = os.path.join(BACKUP_DIR, year, month, day)
+                os.makedirs(dir_path, exist_ok=True)
+                
+                filename = f"{status['id']}.md"
+                filepath = os.path.join(dir_path, filename)
+
+                # 检查文件是否已存在，防止重复下载
+                if not os.path.exists(filepath):
+                    markdown_content = format_to_markdown(status)
+                    
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(markdown_content)
+                    
+                    processed_count += 1
+                    print(f"已保存动态: {filepath}")
+                else:
+                    print(f"文件已存在，跳过: {filepath}")
+
+            # 获取下一页链接
+            next_url = None
+            if 'Link' in response.headers:
+                links = response.headers['Link'].split(',')
+                for link in links:
+                    if 'rel="next"' in link:
+                        next_url = link.split(';')[0].strip('<> ')
+                        
+        except requests.exceptions.RequestException as e:
+            print(f"请求出错: {e}")
+            break
+    
+    print(f"\n备份完成。共处理了 {processed_count} 条新动态。")
 
 if __name__ == "__main__":
-    fetch_and_save_mastodon_posts()
-    print("所有状态已处理完成")
+    backup_statuses()
