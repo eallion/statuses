@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Mastodon Search</title>
+    <link href="./pagefind/pagefind-ui.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+        
+        .search-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .search-container h2 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        #search {
+            width: 100%;
+        }
+        
+        .results-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            display: none;
+        }
+        
+        .stats {
+            background: #f8f9fa;
+            padding: 20px;
+            color: #6c757d;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            display: none;
+        }
+        
+        /* Pagefind UI 自定义样式 */
+        .pagefind-ui__search-input {
+            padding: 15px 20px 15px 32px !important;
+            font-size: 16px !important;
+            border: 2px solid #e9ecef !important;
+            border-radius: 10px !important;
+            width: 100% !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .pagefind-ui__search-input:focus {
+            border-color: #667eea !important;
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+        }
+        
+        .pagefind-ui__search-clear {
+            padding-left: 12px !important;
+        }
+
+        .pagefind-ui__result {
+            margin-bottom: 0 !important;
+            padding: 25px !important;
+            border-bottom: 1px solid #f0f0f0 !important;
+            transition: background-color 0.2s ease !important;
+        }
+        
+        .pagefind-ui__result:hover {
+            background-color: #f8f9fa !important;
+        }
+        
+        .pagefind-ui__result:last-child {
+            border-bottom: none !important;
+        }
+        
+        .pagefind-ui__result-title {
+            font-size: 1.3rem !important;
+            margin-bottom: 12px !important;
+            color: #2c3e50 !important;
+            font-weight: 600 !important;
+        }
+        
+        .pagefind-ui__result-title a {
+            text-decoration: none !important;
+            color: inherit !important;
+        }
+        
+        .pagefind-ui__result-title a:hover {
+            color: #667eea !important;
+        }
+        
+        .pagefind-ui__result-excerpt {
+            color: #555 !important;
+            line-height: 1.7 !important;
+            font-size: 0.95rem !important;
+            word-break: break-all !important;
+        }
+        
+        .pagefind-ui__result-excerpt mark {
+            background: linear-gradient(120deg, #a8e6cf 0%, #dcedc1 100%) !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+            color: #2c3e50 !important;
+            font-weight: 600 !important;
+        }
+        
+        /* JSON 模式的结果显示 */
+        .json-result {
+            padding: 25px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s ease;
+        }
+        
+        .json-result:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .json-result:last-child {
+            border-bottom: none;
+        }
+        
+        .json-result-title {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .json-result-meta {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+        
+        .json-result-excerpt {
+            color: #555;
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+        
+        .tag {
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            margin-right: 5px;
+        }
+        
+        .mode-indicator {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+            color: #7f8c8d;
+            backdrop-filter: blur(10px);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .search-container,
+            .header {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Mastodon Search</h1>
+            <p>快速搜索您的 Markdown 文档内容，支持中文全文搜索</p>
+            <div class="mode-indicator" id="mode-indicator">
+                🔄 检测构建模式中...
+            </div>
+        </div>
+        
+        <div class="search-container">
+            <h2>🔍 搜索 Statuses</h2>
+            <div id="search"></div>
+        </div>
+        
+        <div class="results-container" id="results-container">
+            <div class="stats">
+                <span id="search-stats"></span>
+            </div>
+            <div id="search-results"></div>
+        </div>
+        
+        <div class="no-results" id="no-results">
+            <h3>暂无搜索结果</h3>
+            <p>请尝试其他关键词</p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; eallion@e5n.cc Powered by <a href="https://pagefind.app/" target="_blank" style="color: #667eea; text-decoration: none;">Pagefind</a></p>
+        </div>
+    </div>
+
+    <script src="./pagefind/pagefind-ui.js"></script>
+    <script>
+        let documentsData = null;
+        let isJsonMode = false;
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 初始化轻量级搜索应用...');
+            
+            // 检测构建模式
+            await detectBuildMode();
+            
+            // 初始化搜索功能
+            initializeSearch();
+        });
+        
+        async function detectBuildMode() {
+            try {
+                const response = await fetch('./documents.json');
+                if (response.ok) {
+                    documentsData = await response.json();
+                    isJsonMode = true;
+                    document.getElementById('mode-indicator').innerHTML = '📦 JSON 模式 - 已合并 ' + documentsData.length + ' 个文档';
+                    console.log('✅ 检测到 JSON 模式，加载了', documentsData.length, '个文档');
+                } else {
+                    throw new Error('JSON 文件不存在');
+                }
+            } catch (error) {
+                isJsonMode = false;
+                document.getElementById('mode-indicator').innerHTML = '📄 页面模式 - 独立文档页面';
+                console.log('✅ 使用页面模式');
+            }
+        }
+        
+        function initializeSearch() {
+            if (typeof PagefindUI === 'undefined') {
+                console.error('❌ PagefindUI 未定义');
+                document.getElementById('search').innerHTML = '<p style="color: red;">搜索功能加载失败：PagefindUI 未定义</p>';
+                return;
+            }
+            
+            try {
+                console.log('🔧 初始化 PagefindUI...');
+                
+                const ui = new PagefindUI({ 
+                    element: "#search",
+                    showSubResults: true,
+                    showImages: false,
+                    excerptLength: 150,
+                    resetStyles: false,
+                    translations: {
+                        placeholder: "搜索文档内容...",
+                        clear_search: "清除搜索",
+                        load_more: "加载更多结果",
+                        search_label: "搜索此站点",
+                        filters_label: "筛选",
+                        zero_results: "没有找到相关结果",
+                        many_results: "找到 [SEARCH_TERM] 的 [COUNT] 个结果",
+                        one_result: "找到 [SEARCH_TERM] 的 [COUNT] 个结果",
+                        alt_search: "没有找到 [SEARCH_TERM] 的结果。显示 [DIFFERENT_TERM] 的结果：",
+                        search_suggestion: "没有找到 [SEARCH_TERM] 的结果。请尝试以下搜索之一：",
+                        searching: "搜索 [SEARCH_TERM]..."
+                    }
+                });
+                
+                console.log('✅ PagefindUI 初始化成功');
+                
+                // 监听搜索结果
+                setTimeout(() => {
+                    observeSearchResults();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('❌ 初始化 PagefindUI 失败：', error);
+                document.getElementById('search').innerHTML = '<p style="color: red;">搜索功能初始化失败：' + error.message + '</p>';
+            }
+        }
+        
+        function observeSearchResults() {
+            const searchContainer = document.querySelector('#search');
+            if (!searchContainer) return;
+            
+            const observer = new MutationObserver((mutations) => {
+                const results = document.querySelector('.pagefind-ui__results');
+                const resultsContainer = document.getElementById('results-container');
+                const noResults = document.getElementById('no-results');
+                const searchInput = document.querySelector('.pagefind-ui__search-input');
+                const searchTerm = searchInput ? searchInput.value.trim() : '';
+                
+                if (results && searchTerm) {
+                    if (results.children.length > 0) {
+                        resultsContainer.style.display = 'block';
+                        noResults.style.display = 'none';
+                        
+                        // 更新统计信息
+                        const statsElement = document.getElementById('search-stats');
+                        const resultCount = results.children.length;
+                        const modeText = isJsonMode ? ' (JSON 模式)' : ' (页面模式)';
+                        statsElement.textContent = `找到 "${searchTerm}" 的 ${resultCount} 个相关结果${modeText}`;
+                        
+                    } else {
+                        resultsContainer.style.display = 'none';
+                        noResults.style.display = 'block';
+                    }
+                } else {
+                    resultsContainer.style.display = 'none';
+                    noResults.style.display = 'none';
+                }
+            });
+            
+            observer.observe(searchContainer, { 
+                childList: true, 
+                subtree: true 
+            });
+        }
+    </script>
+</body>
+</html>

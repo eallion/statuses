@@ -1,0 +1,29 @@
+{
+  "name": "pagefind-markdown-search",
+  "version": "1.0.0",
+  "description": "基于 Pagefind 的 Markdown 文件搜索应用",
+  "main": "index.html",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "serve": "cd docs && npx http-server -p 3000 -c-1",
+    "dev": "npm run build && npm run serve",
+    "install-pagefind": "npm install -g @pagefind/default-ui",
+    "deploy:vercel": "vercel --prod",
+    "deploy:netlify": "netlify deploy --prod --dir=docs",
+    "clean": "rm -rf docs"
+  },
+  "keywords": [
+    "pagefind",
+    "search",
+    "markdown",
+    "静态站点"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "pagefind": "^1.4.0"
+  }
+}
