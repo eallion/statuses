@@ -3,383 +3,335 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📚 Mastodon Search</title>
-    <link href="./pagefind/pagefind-ui.css" rel="stylesheet">
+    <title>Mastodon Statuses Search</title>
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/minisearch@7/dist/umd/index.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-        }
-        
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 40px 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            backdrop-filter: blur(10px);
-        }
-        
-        .header h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-            font-size: 2.5rem;
-            font-weight: 700;
-        }
-        
-        .header p {
-            color: #7f8c8d;
-            font-size: 1.1rem;
-        }
-        
-        .search-container {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .search-container h2 {
-            margin-bottom: 20px;
-            color: #2c3e50;
-        }
-        
-        #search {
-            width: 100%;
-        }
-        
-        .results-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            overflow: hidden;
-            backdrop-filter: blur(10px);
-            display: none;
-        }
-        
-        .stats {
-            background: #f8f9fa;
-            padding: 20px;
-            color: #6c757d;
-            font-size: 0.9rem;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .no-results {
-            text-align: center;
-            padding: 40px;
-            color: #7f8c8d;
-            display: none;
-        }
-        
-        /* Pagefind UI 自定义样式 */
-        .pagefind-ui__search-input {
-            padding: 15px 20px 15px 32px !important;
-            font-size: 16px !important;
-            border: 2px solid #e9ecef !important;
-            border-radius: 10px !important;
-            width: 100% !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .pagefind-ui__search-input:focus {
-            border-color: #667eea !important;
-            outline: none !important;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1) !important;
-        }
-        
-        .pagefind-ui__search-clear {
-            padding-left: 12px !important;
+        :root {
+            --primary-color: #6364FF;
+            --background-color: #f5f7fa;
+            --card-background: #ffffff;
+            --text-color: #333333;
+            --border-color: #e1e5e9;
+            --hover-color: #f0f2f5;
         }
 
-        .pagefind-ui__result {
-            margin-bottom: 0 !important;
-            padding: 25px !important;
-            border-bottom: 1px solid #f0f0f0 !important;
-            transition: background-color 0.2s ease !important;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
         }
-        
-        .pagefind-ui__result:hover {
-            background-color: #f8f9fa !important;
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
         }
-        
-        .pagefind-ui__result:last-child {
-            border-bottom: none !important;
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 20px;
         }
-        
-        .pagefind-ui__result-title {
-            font-size: 1.3rem !important;
-            margin-bottom: 12px !important;
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
+
+        header svg {
+            transform: scale(1.2);
         }
-        
-        .pagefind-ui__result-title a {
-            text-decoration: none !important;
-            color: inherit !important;
-        }
-        
-        .pagefind-ui__result-title a:hover {
-            color: #667eea !important;
-        }
-        
-        .pagefind-ui__result-excerpt {
-            color: #555 !important;
-            line-height: 1.7 !important;
-            font-size: 0.95rem !important;
-            word-break: break-all !important;
-        }
-        
-        .pagefind-ui__result-excerpt mark {
-            background: linear-gradient(120deg, #a8e6cf 0%, #dcedc1 100%) !important;
-            padding: 2px 4px !important;
-            border-radius: 3px !important;
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        /* JSON 模式的结果显示 */
-        .json-result {
-            padding: 25px;
-            border-bottom: 1px solid #f0f0f0;
-            transition: background-color 0.2s ease;
-        }
-        
-        .json-result:hover {
-            background-color: #f8f9fa;
-        }
-        
-        .json-result:last-child {
-            border-bottom: none;
-        }
-        
-        .json-result-title {
-            font-size: 1.3rem;
-            margin-bottom: 12px;
-            color: #2c3e50;
-            font-weight: 600;
-        }
-        
-        .json-result-meta {
-            font-size: 0.85rem;
-            color: #6c757d;
+
+        h1 {
+            color: var(--primary-color);
             margin-bottom: 10px;
         }
-        
-        .json-result-excerpt {
-            color: #555;
-            line-height: 1.7;
-            font-size: 0.95rem;
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
         }
-        
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .search-box {
+            display: flex;
+            margin-bottom: 30px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px 0 0 6px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-box button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 0 6px 6px 0;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .search-box button:hover {
+            opacity: 0.9;
+        }
+
+        .results {
+            display: grid;
+            gap: 20px;
+        }
+
+        .result-item {
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .result-item h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .result-item p {
+            color: #666;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .result-item .meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #999;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        .tags {
+            margin-top: 10px;
+        }
+
         .tag {
-            background: #e9ecef;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 0.8rem;
+            display: inline-block;
+            background-color: #e1e5e9;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
             margin-right: 5px;
         }
-        
-        .mode-indicator {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-        
-        .footer {
+
+        footer {
             text-align: center;
             margin-top: 40px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 15px;
-            color: #7f8c8d;
-            backdrop-filter: blur(10px);
+            font-size: 14px;
+            color: #999;
         }
-        
-        @media (max-width: 768px) {
-            .container {
+
+        @media (max-width: 600px) {
+            body {
                 padding: 10px;
             }
             
-            .header h1 {
-                font-size: 2rem;
+            .search-box {
+                flex-direction: column;
             }
             
-            .search-container,
-            .header {
-                padding: 20px;
+            .search-box input,
+            .search-box button {
+                border-radius: 6px;
+                margin-bottom: 10px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📚 Mastodon Search</h1>
-            <p>快速搜索您的 Markdown 文档内容，支持中文全文搜索</p>
-            <div class="mode-indicator" id="mode-indicator">
-                🔄 检测构建模式中...
-            </div>
+        <header>
+            <svg width="75" height="79" viewBox="0 0 75 79" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M73.84 17.49C72.696 9.002 65.3 2.312 56.53 1.016 55.05.797 49.444 0 36.458 0h-.097c-12.99 0-15.776.797-17.256 1.016-8.525 1.26-16.311 7.271-18.2 15.86-.909 4.23-1.006 8.919-.837 13.22.24 6.17.288 12.327.848 18.47a87 87 0 0 0 2.022 12.115c1.795 7.361 9.064 13.487 16.185 15.986a43.4 43.4 0 0 0 23.68 1.25 35 35 0 0 0 2.562-.701c1.91-.607 4.147-1.285 5.792-2.477a.19.19 0 0 0 .076-.144v-5.953a.175.175 0 0 0-.216-.17 65.6 65.6 0 0 1-15.367 1.796c-8.906 0-11.301-4.226-11.987-5.985a18.6 18.6 0 0 1-1.042-4.718.17.17 0 0 1 .136-.178.2.2 0 0 1 .08.002 64.4 64.4 0 0 0 15.115 1.795c1.225 0 2.446 0 3.67-.032 5.121-.144 10.52-.406 15.558-1.39.125-.025.251-.047.359-.079 7.947-1.526 15.51-6.316 16.279-18.445.029-.477.1-5.002.1-5.497.004-1.684.543-11.946-.079-18.251" fill="url(#a)"/><path d="M61.248 27.026v21.088h-8.356V27.648c0-4.31-1.796-6.507-5.448-6.507-4.015 0-6.026 2.6-6.026 7.735v11.202H33.11V28.875c0-5.134-2.014-7.734-6.03-7.734-3.63 0-5.444 2.198-5.444 6.507v20.466h-8.353V27.026q0-6.462 3.3-10.269c2.27-2.531 5.247-3.831 8.942-3.831 4.278 0 7.51 1.644 9.665 4.93l2.079 3.49 2.083-3.49c2.154-3.286 5.386-4.93 9.657-4.93 3.691 0 6.668 1.3 8.945 3.831q3.297 3.802 3.293 10.27" fill="#fff"/><defs><linearGradient id="a" x1="37.069" y1="0" x2="37.069" y2="79" gradientUnits="userSpaceOnUse"><stop stop-color="#6364FF"/><stop offset="1" stop-color="#563ACC"/></linearGradient></defs></svg>
+            <h1>Mastodon Statuses Search</h1>
+            <p>搜索 <a href="https://e5n.cc/@eallion" target="_blank">@eallion@e5n.cc</a> 的嘟文内容（包含回复和转嘟）</p>
+        </header>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="输入搜索关键词..." autocomplete="off">
+            <button onclick="performSearch()">搜索</button>
         </div>
-        
-        <div class="search-container">
-            <h2>🔍 搜索 Statuses</h2>
-            <div id="search"></div>
+
+        <div id="results" class="results">
+            <!-- 搜索结果将在这里显示 -->
         </div>
-        
-        <div class="results-container" id="results-container">
-            <div class="stats">
-                <span id="search-stats"></span>
-            </div>
-            <div id="search-results"></div>
-        </div>
-        
-        <div class="no-results" id="no-results">
-            <h3>暂无搜索结果</h3>
-            <p>请尝试其他关键词</p>
-        </div>
-        
-        <div class="footer">
-            <p>&copy; eallion@e5n.cc Powered by <a href="https://pagefind.app/" target="_blank" style="color: #667eea; text-decoration: none;">Pagefind</a></p>
-        </div>
+
+        <footer>
+            <p>&copy; All Rights Reserved. @eallion@e5n.cc, Powered by <a href="https://github.com/lucaong/minisearch" target="_blank">MiniSearch</a>.</p>
+        </footer>
     </div>
 
-    <script src="./pagefind/pagefind-ui.js"></script>
     <script>
-        let documentsData = null;
-        let isJsonMode = false;
+        // 全局搜索实例
+        let miniSearch;
         
-        document.addEventListener('DOMContentLoaded', async function() {
-            console.log('🚀 初始化轻量级搜索应用...');
-            
-            // 检测构建模式
-            await detectBuildMode();
-            
-            // 初始化搜索功能
-            initializeSearch();
-        });
+        // 中文分词器
+        const segmenter = Intl.Segmenter && new Intl.Segmenter('zh', { granularity: 'word' });
         
-        async function detectBuildMode() {
-            try {
-                const response = await fetch('./documents.json');
-                if (response.ok) {
-                    documentsData = await response.json();
-                    isJsonMode = true;
-                    document.getElementById('mode-indicator').innerHTML = '📦 JSON 模式 - 已合并 ' + documentsData.length + ' 个文档';
-                    console.log('✅ 检测到 JSON 模式，加载了', documentsData.length, '个文档');
-                } else {
-                    throw new Error('JSON 文件不存在');
+        // 自定义分词函数
+        function customTokenizer(text) {
+            // 如果不支持 Intl.Segmenter，则使用默认分词方式
+            if (!segmenter) {
+                return text.toLowerCase().split(/\W+/).filter(term => term);
+            }
+            
+            // 使用 Intl.Segmenter 进行中文分词
+            const tokens = [];
+            for (const seg of segmenter.segment(text)) {
+                // 过滤掉空格和标点符号
+                if (/\S/.test(seg.segment)) {
+                    tokens.push(seg.segment);
                 }
+            }
+            return tokens;
+        }
+        
+        // 初始化搜索
+        async function initializeSearch() {
+            try {
+                // 加载搜索数据
+                const response = await fetch('./search-data.json');
+                const documents = await response.json();
+                
+                // 创建 MiniSearch 实例
+                miniSearch = new MiniSearch({
+                    fields: ['title', 'content', 'tags'], // 搜索字段
+                    storeFields: ['title', 'date', 'tags', 'content'], // 存储字段
+                    searchOptions: {
+                        boost: { title: 5, tags: 3 },
+                        fuzzy: 0.2,
+                        prefix: true
+                    },
+                    tokenize: customTokenizer, // 使用自定义分词器
+                    processTerm: (term) => {
+                        // 使用自定义分词处理
+                        if (!segmenter) return term.toLowerCase();
+                        const tokens = customTokenizer(term);
+                        return tokens.length > 0 ? tokens : term;
+                    }
+                });
+                
+                // 添加文档到索引
+                miniSearch.addAll(documents);
+                
+                console.log('搜索索引初始化完成，共', documents.length, '个文档');
             } catch (error) {
-                isJsonMode = false;
-                document.getElementById('mode-indicator').innerHTML = '📄 页面模式 - 独立文档页面';
-                console.log('✅ 使用页面模式');
+                console.error('搜索初始化失败：', error);
             }
         }
         
-        function initializeSearch() {
-            if (typeof PagefindUI === 'undefined') {
-                console.error('❌ PagefindUI 未定义');
-                document.getElementById('search').innerHTML = '<p style="color: red;">搜索功能加载失败：PagefindUI 未定义</p>';
+        // 执行搜索
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const resultsContainer = document.getElementById('results');
+            
+            if (!query) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+            
+            if (!miniSearch) {
+                resultsContainer.innerHTML = '<div class="no-results">搜索功能初始化中...</div>';
                 return;
             }
             
             try {
-                console.log('🔧 初始化 PagefindUI...');
-                
-                const ui = new PagefindUI({ 
-                    element: "#search",
-                    showSubResults: true,
-                    showImages: false,
-                    excerptLength: 150,
-                    resetStyles: false,
-                    translations: {
-                        placeholder: "搜索文档内容...",
-                        clear_search: "清除搜索",
-                        load_more: "加载更多结果",
-                        search_label: "搜索此站点",
-                        filters_label: "筛选",
-                        zero_results: "没有找到相关结果",
-                        many_results: "找到 [SEARCH_TERM] 的 [COUNT] 个结果",
-                        one_result: "找到 [SEARCH_TERM] 的 [COUNT] 个结果",
-                        alt_search: "没有找到 [SEARCH_TERM] 的结果。显示 [DIFFERENT_TERM] 的结果：",
-                        search_suggestion: "没有找到 [SEARCH_TERM] 的结果。请尝试以下搜索之一：",
-                        searching: "搜索 [SEARCH_TERM]..."
-                    }
+                const results = miniSearch.search(query, { 
+                    limit: 50,
+                    enrich: true
                 });
                 
-                console.log('✅ PagefindUI 初始化成功');
-                
-                // 监听搜索结果
-                setTimeout(() => {
-                    observeSearchResults();
-                }, 1000);
-                
+                displayResults(results, query);
             } catch (error) {
-                console.error('❌ 初始化 PagefindUI 失败：', error);
-                document.getElementById('search').innerHTML = '<p style="color: red;">搜索功能初始化失败：' + error.message + '</p>';
+                console.error('搜索出错：', error);
+                resultsContainer.innerHTML = '<div class="no-results">搜索出错，请重试</div>';
             }
         }
         
-        function observeSearchResults() {
-            const searchContainer = document.querySelector('#search');
-            if (!searchContainer) return;
+        // 显示搜索结果
+        function displayResults(results, query) {
+            const resultsContainer = document.getElementById('results');
             
-            const observer = new MutationObserver((mutations) => {
-                const results = document.querySelector('.pagefind-ui__results');
-                const resultsContainer = document.getElementById('results-container');
-                const noResults = document.getElementById('no-results');
-                const searchInput = document.querySelector('.pagefind-ui__search-input');
-                const searchTerm = searchInput ? searchInput.value.trim() : '';
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">未找到相关结果</div>';
+                return;
+            }
+            
+            const resultsHtml = results.map(result => {
+                const { title, date, tags, content } = result;
+                const highlightedTitle = highlightMatch(title || '无标题', query);
+                const highlightedContent = highlightMatch(content || '', query);
                 
-                if (results && searchTerm) {
-                    if (results.children.length > 0) {
-                        resultsContainer.style.display = 'block';
-                        noResults.style.display = 'none';
-                        
-                        // 更新统计信息
-                        const statsElement = document.getElementById('search-stats');
-                        const resultCount = results.children.length;
-                        const modeText = isJsonMode ? ' (JSON 模式)' : ' (页面模式)';
-                        statsElement.textContent = `找到 "${searchTerm}" 的 ${resultCount} 个相关结果${modeText}`;
-                        
-                    } else {
-                        resultsContainer.style.display = 'none';
-                        noResults.style.display = 'block';
-                    }
-                } else {
-                    resultsContainer.style.display = 'none';
-                    noResults.style.display = 'none';
-                }
-            });
+                return `
+                    <div class="result-item">
+                        <h3 class="result-title"><a href="https://e5n.cc/@eallion/${highlightedTitle}" target="_blank">${highlightedTitle}</a><svg xmlns="http://www.w3.org/2000/svg" width="1rem" height="1rem" viewBox="0 0 24 24"><g fill="currentColor"><path d="M15.64 7.025h-3.622v-2h7v7h-2v-3.55l-4.914 4.914l-1.414-1.414z"/><path d="M10.982 6.975h-6v12h12v-6h-2v4h-8v-8h4z"/></g></svg></h3>
+                        <p class="result-content">${highlightedContent}</p>
+                        <div class="meta">
+                            <span>${date || ''}</span>
+                            ${tags && tags.length > 0 ? `<div class="tags">${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
             
-            observer.observe(searchContainer, { 
-                childList: true, 
-                subtree: true 
-            });
+            resultsContainer.innerHTML = resultsHtml;
         }
+
+        // 高亮匹配的文本
+        function highlightMatch(text, query) {
+            if (!text || !query) return text || '';
+            
+            // 使用 Intl.Segmenter 对查询词进行分词
+            let processedQuery = query;
+            if (segmenter) {
+                const queryTokens = customTokenizer(query);
+                processedQuery = queryTokens.join('|');
+            }
+            
+            const regex = new RegExp(`(${processedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<mark>$1</mark>');
+        }
+        
+        // 监听输入框的回车键
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+        
+        // 实时搜索（可选）
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        });
+        
+        // 初始化搜索
+        initializeSearch();
     </script>
 </body>
 </html>

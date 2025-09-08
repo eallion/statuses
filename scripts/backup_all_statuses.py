@@ -4,8 +4,8 @@ from datetime import datetime
 import html2text
 
 # 配置
-MASTODON_INSTANCE = "e5n.cc" # 替换为你的 Mastodon 实例域名
-ACCOUNT_ID = "111136231674527355" # 替换为你的账户 ID
+MASTODON_INSTANCE = "" # 替换为你的 Mastodon 实例域名
+ACCOUNT_ID = "" # 替换为你的账户 ID
 BACKUP_DIR = "content"  # content 目录
 INCLUDE_REPLIES = True  # 是否包含回复
 INCLUDE_REBLOGS = True  # 是否包含转嘟
