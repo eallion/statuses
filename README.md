@@ -1,6 +1,6 @@
 # Mastodon Statuses 搜索项目
 
-这个项目是一个基于 MiniSearch 的轻量级 Web 应用，用于搜索 Markdown 文件内容。
+这个项目是一个基于 FlexSearch 的轻量级 Web 应用，用于搜索 Markdown 文件内容。
 
 ## 功能特点
 
@@ -13,7 +13,7 @@
 ## 技术架构
 
 - 前端：HTML, CSS, JavaScript
-- 搜索引擎：MiniSearch
+- 搜索引擎：FlexSearch
 - 构建工具：Node.js 脚本
 - 部署：静态网站托管 (Vercel, Netlify, Cloudflare Pages)
 
@@ -25,7 +25,7 @@
 npm run build
 ```
 
-该命令会处理 content 目录中的 Markdown 文件，并生成搜索数据到 docs 目录。
+该命令会处理 content 目录中的 Markdown 文件，并生成搜索数据到 public 目录。
 
 ### 本地开发
 
@@ -49,15 +49,18 @@ npm run serve
 
 在 Cloudflare Pages 控制台中设置：
 
-- 构建命令：`npm install && npm run build`
-- 输出目录：`docs`
+- 安装命令：`npm install`
+- 构建命令：`npm run build`
+- 输出目录：`public`
+
+> 如果是 Fork 的仓库，需要改 index.html 里的 Cloudflare Turnstile 的 SiteKey 和 Analytics 的 Tracking ID。
 
 ## 目录结构
 
 ```
 project/
 ├── content/           # Markdown 文件目录
-├── docs/              # 构建输出目录
+├── public/              # 构建输出目录
 ├── scripts/           # 构建脚本目录
 ├── index.html         # 主页模板
 ├── package.json       # 项目配置文件

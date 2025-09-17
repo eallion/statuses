@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mastodon Statuses Search</title>
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/flexsearch@0.7.31/dist/flexsearch.bundle.min.js"></script>
+    <script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+        data-cf-beacon='{"token": "e5bb5b2d7e8340b2aaa740efb200b066"}'></script>
+    <style>
+        :root {
+            --primary-color: #6364FF;
+            --background-color: #f5f7fa;
+            --card-background: #ffffff;
+            --text-color: #333333;
+            --border-color: #e1e5e9;
+            --hover-color: #f0f2f5;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            display: flex;
+            min-height: 100vh;
+            height: 100%;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+            flex-direction: column;
+        }
+
+        .container {
+            width: calc(100% - 20px);
+            max-width: 800px;
+            margin: 0 auto;
+            flex-grow: 1;
+        }
+
+        header {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        header svg {
+            transform: scale(1.2);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Google-style search bar */
+        .search-box {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            background-color: var(--card-background);
+        }
+
+        .search-box:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .search-box input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: none;
+            font-size: 16px;
+            outline: none;
+            background-color: transparent;
+        }
+
+        .search-box .icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 8px;
+            color: #999;
+            cursor: pointer;
+        }
+
+        .search-box .icon:hover {
+            color: #555;
+        }
+
+        .search-box button {
+            display: none;
+            /* Hide the original search button */
+        }
+
+        .cf-turnstile {
+            text-align: center;
+        }
+
+        .results {
+            display: grid;
+            gap: 20px;
+        }
+
+        .result-item {
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .result-item h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .result-item p {
+            color: #666;
+            margin-bottom: 10px;
+            word-break: break-all;
+        }
+
+        .result-item .meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #999;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+        }
+
+        .tags {
+            margin-top: 10px;
+        }
+
+        .tag {
+            display: inline-block;
+            background-color: #e1e5e9;
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 14px;
+            color: #999;
+            padding: 0;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .search-box {
+                flex-direction: row;
+            }
+
+            .search-box input {
+                border-radius: 24px;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <svg width="75" height="79" viewBox="0 0 75 79" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                    d="M73.84 17.49C72.696 9.002 65.3 2.312 56.53 1.016 55.05.797 49.444 0 36.458 0h-.097c-12.99 0-15.776.797-17.256 1.016-8.525 1.26-16.311 7.271-18.2 15.86-.909 4.23-1.006 8.919-.837 13.22.24 6.17.288 12.327.848 18.47a87 87 0 0 0 2.022 12.115c1.795 7.361 9.064 13.487 16.185 15.986a43.4 43.4 0 0 0 23.68 1.25 35 35 0 0 0 2.562-.701c1.91-.607 4.147-1.285 5.792-2.477a.19.19 0 0 0 .076-.144v-5.953a.175.175 0 0 0-.216-.17 65.6 65.6 0 0 1-15.367 1.796c-8.906 0-11.301-4.226-11.987-5.985a18.6 18.6 0 0 1-1.042-4.718.17.17 0 0 1 .136-.178.2.2 0 0 1 .08.002 64.4 64.4 0 0 0 15.115 1.795c1.225 0 2.446 0 3.67-.032 5.121-.144 10.52-.406 15.558-1.39.125-.025.251-.047.359-.079 7.947-1.526 15.51-6.316 16.279-18.445.029-.477.1-5.002.1-5.497.004-1.684.543-11.946-.079-18.251"
+                    fill="url(#a)" />
+                <path
+                    d="M61.248 27.026v21.088h-8.356V27.648c0-4.31-1.796-6.507-5.448-6.507-4.015 0-6.026 2.6-6.026 7.735v11.202H33.11V28.875c0-5.134-2.014-7.734-6.03-7.734-3.63 0-5.444 2.198-5.444 6.507v20.466h-8.353V27.026q0-6.462 3.3-10.269c2.27-2.531 5.247-3.831 8.942-3.831 4.278 0 7.51 1.644 9.665 4.93l2.079 3.49 2.083-3.49c2.154-3.286 5.386-4.93 9.657-4.93 3.691 0 6.668 1.3 8.945 3.831q3.297 3.802 3.293 10.27"
+                    fill="#fff" />
+                <defs>
+                    <linearGradient id="a" x1="37.069" y1="0" x2="37.069" y2="79" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#6364FF" />
+                        <stop offset="1" stop-color="#563ACC" />
+                    </linearGradient>
+                </defs>
+            </svg>
+            <h1>Mastodon Statuses Search</h1>
+            <p>搜索 <a href="https://e5n.cc/@eallion" target="_blank">@eallion@e5n.cc</a> 的嘟文内容（包含回复和转嘟）</p>
+        </header>
+
+        <div class="search-box hidden" id="searchBox">
+            <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="2rem" height="2rem" viewBox="0 0 24 24"><path fill="currentColor" d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5l-1.5 1.5l-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16A6.5 6.5 0 0 1 3 9.5A6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14S14 12 14 9.5S12 5 9.5 5"/></svg>
+            <input type="text" id="searchInput" placeholder="输入搜索关键词..." autocomplete="off">
+            <svg id="micIcon" class="icon" xmlns="http://www.w3.org/2000/svg" width="1rem" height="1rem" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 5 5a5 5 0 0 0 5-5z"/></svg>
+        </div>
+        <div class="cf-turnstile" data-sitekey="0x4AAAAAAB12_ZC8Z3dhRTM4" data-callback="onTurnstileSuccess"></div>
+
+        <div id="results" class="results">
+        </div>
+    </div>
+    <footer>
+        <p>&copy; e5n.cc, All Rights Reserved. Powered by <a href="https://github.com/nextapps-de/flexsearch"
+                target="_blank">FlexSearch</a>.</p>
+    </footer>
+
+    <script>
+        let flexSearchIndex;
+        let recognition;
+
+        // Check for Web Speech API support
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const micIcon = document.getElementById('micIcon');
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'zh-CN'; // Set language to Chinese
+
+            micIcon.addEventListener('click', () => {
+                recognition.start();
+                micIcon.style.color = '#e53935'; // Change color to indicate listening
+                console.log('Listening for speech...');
+            });
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                document.getElementById('searchInput').value = transcript;
+                performSearch();
+            };
+
+            recognition.onend = () => {
+                micIcon.style.color = '#999'; // Reset icon color
+                console.log('Speech recognition ended.');
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                micIcon.style.color = '#999';
+            };
+        } else {
+            // If not supported, hide the microphone icon
+            micIcon.style.display = 'none';
+        }
+
+        async function initializeSearch() {
+            try {
+                const response = await fetch('./search-data.json');
+                const documents = await response.json();
+
+                flexSearchIndex = new FlexSearch.Document({
+                    id: "id",
+                    index: ["searchContent", "searchTags"],
+                    store: true,
+                    tokenize: "split"
+                });
+
+                documents.forEach(doc => {
+                    if (doc && (doc.id !== undefined)) {
+                        flexSearchIndex.add({
+                            id: doc.id,
+                            title: doc.title || "",
+                            content: doc.content || "",
+                            date: doc.date || "",
+                            tags: doc.tags || [],
+                            searchContent: doc.searchContent || "",
+                            searchTags: doc.searchTags || ""
+                        });
+                    }
+                });
+
+                console.log('索引构建完成');
+
+            } catch (error) {
+                console.error('搜索初始化失败：', error);
+                document.getElementById('results').innerHTML = '<div class="no-results">搜索功能初始化失败，请检查控制台错误。</div>';
+            }
+        }
+
+        function parseCustomDate(dateString) {
+            if (!dateString) return null;
+            const parts = dateString.match(/(\w{3}) (\d{1,2}), (\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+            if (!parts) return new Date(dateString);
+            const monthMap = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+            const [, monthStr, day, year, hour, minute, second] = parts;
+            return new Date(year, monthMap[monthStr], day, hour, minute, second);
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                document.getElementById('results').innerHTML = '';
+                return;
+            }
+            if (!flexSearchIndex) {
+                document.getElementById('results').innerHTML = '<div class="no-results">搜索功能仍在初始化，请稍候...</div>';
+                return;
+            }
+
+            // 检查 Turnstile 验证
+            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+            if (!turnstileResponse || !turnstileResponse.value) {
+                document.getElementById('results').innerHTML = '<div class="no-results">请完成验证码验证</div>';
+                return;
+            }
+
+            try {
+                const searchResults = flexSearchIndex.search(query, { limit: 100 });
+                const uniqueIds = new Set();
+                searchResults.forEach(fieldResult => fieldResult.result.forEach(id => uniqueIds.add(id)));
+                const processedResults = [];
+                uniqueIds.forEach(id => {
+                    const doc = flexSearchIndex.get(id);
+                    if (doc) processedResults.push(doc);
+                });
+                processedResults.sort((a, b) => (parseCustomDate(b.date) || 0) - (parseCustomDate(a.date) || 0));
+                displayResults(processedResults, query);
+
+                // 验证成功后隐藏验证码并显示搜索框
+                const turnstileContainer = document.querySelector('.cf-turnstile');
+                const searchBox = document.getElementById('searchBox');
+                if (turnstileContainer && searchBox) {
+                    turnstileContainer.classList.add('hidden');
+                    searchBox.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('搜索出错：', error);
+                document.getElementById('results').innerHTML = '<div class="no-results">搜索出错，请重试</div>';
+            }
+        }
+
+        function displayResults(results, query) {
+            const resultsContainer = document.getElementById('results');
+            if (!results || results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">未找到相关结果</div>';
+                return;
+            }
+            const resultsHtml = results.map(result => {
+                // --- MODIFIED: Clean Markdown from content ---
+                // Replaces Markdown links like [text](url) with just "text"
+                let cleanContent = result.content || '';
+                cleanContent = cleanContent.replace(/\[(.*?)\]\(.*?\)/g, '$1');
+
+                const displayContent = cleanContent.substring(0, 200) + (cleanContent.length > 200 ? '...' : '');
+                const highlightedContent = highlightMatch(displayContent, query);
+                const cleanTags = (Array.isArray(result.tags) ? result.tags : []).map(tag => tag.replace(/['"]/g, ''));
+
+                return `
+          <div class="result-item" onclick="window.open('https://e5n.cc/@eallion/${result.title}', '_blank')">
+            <h3 class="result-title"><a href="https://e5n.cc/@eallion/${result.title}" target="_blank">${result.title}</a><svg xmlns="http://www.w3.org/2000/svg" width="1rem" height="1rem" viewBox="0 0 24 24"><g fill="currentColor"><path d="M15.64 7.025h-3.622v-2h7v7h-2v-3.55l-4.914 4.914l-1.414-1.414z"/><path d="M10.982 6.975h-6v12h12v-6h-2v4h-8v-8h4z"/></g></svg></h3>
+            <p class="result-content">${highlightedContent}</p>
+            <div class="meta">
+              <span>${result.date || ''}</span>
+              ${cleanTags.length > 0 ? `<div class="tags">${cleanTags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div>` : ''}
+            </div>
+          </div>
+        `;
+            }).join('');
+            resultsContainer.innerHTML = resultsHtml;
+        }
+
+        function highlightMatch(text, query) {
+            if (!text || !query) return text || '';
+            const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return text.replace(regex, '<mark>$1</mark>');
+        }
+
+        document.getElementById('searchInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        let searchTimeout;
+        document.getElementById('searchInput').addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(performSearch, 300);
+        });
+
+        initializeSearch();
+    </script>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback" async
+        defer></script>
+    <script>
+        function onloadTurnstileCallback() {
+            // Turnstile 加载完成后执行的回调
+            console.log('Turnstile loaded');
+        }
+
+        // 添加验证成功回调
+        function onTurnstileSuccess() {
+            const searchBox = document.getElementById('searchBox');
+            const turnstileContainer = document.querySelector('.cf-turnstile');
+            if (searchBox && turnstileContainer) {
+                searchBox.classList.remove('hidden');
+                turnstileContainer.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+
+</html>

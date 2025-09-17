@@ -3,9 +3,9 @@ const path = require('path');
 
 // 配置
 const CONTENT_DIR = './content';
-const DOCS_DIR = './docs';
+const DOCS_DIR = './public';
 
-// 确保 docs 目录存在
+// 确保 public 目录存在
 if (!fs.existsSync(DOCS_DIR)) {
     fs.mkdirSync(DOCS_DIR, { recursive: true });
 }
@@ -125,9 +125,46 @@ function scanMarkdownFiles(dir) {
     return markdownFiles;
 }
 
-// 为 MiniSearch 生成搜索数据
+// 简单的中文分词函数
+function tokenizeChinese(text) {
+    if (!text) return [];
+    
+    // 移除 HTML 标签和 Markdown 格式
+    text = text.replace(/<[^>]*>/g, '');
+    text = text.replace(/[#*_[\]()`~\-+={}\\|:;'",.<>?/]/g, ' ');
+    
+    // 按空格和常见标点符号分割
+    const tokens = text.split(/[\s\u3000\p{P}\p{S}]+/u).filter(token => token.length > 0);
+    
+    // 对于中文，进一步拆分为字符级别
+    const result = [];
+    tokens.forEach(token => {
+        // 如果包含中文字符
+        if (/[\u4e00-\u9fff]/.test(token)) {
+            // 添加整个词
+            result.push(token);
+            
+            // 添加词的各个字符
+            for (let i = 0; i < token.length; i++) {
+                result.push(token[i]);
+            }
+            
+            // 添加双字符组合
+            for (let i = 0; i < token.length - 1; i++) {
+                result.push(token.substr(i, 2));
+            }
+        } else {
+            // 非中文词直接添加
+            result.push(token);
+        }
+    });
+    
+    return [...new Set(result)]; // 去重
+}
+
+// 为 FlexSearch 生成搜索数据
 function buildSearchData(markdownFiles) {
-    const outputDir = path.join(__dirname, '../docs');
+    const outputDir = path.join(__dirname, '../public');
     
     // 按日期排序（先过滤掉没有日期的文件）
     const filesWithDate = markdownFiles.filter(file => file.frontmatter && file.frontmatter.date);
@@ -175,13 +212,29 @@ function buildSearchData(markdownFiles) {
             date = `${month} ${day}, ${year} ${hours}:${minutes}:${seconds}`;
         }
 
-        return {
+        // 获取标签
+        const tags = Array.isArray(file.frontmatter && file.frontmatter.tags) ? file.frontmatter.tags : [];
+        
+        // 生成分词字段
+        const searchContent = tokenizeChinese(contentWithoutFrontmatter).join(' ');
+        
+        // 构建返回对象
+        const result = {
             id: index,
             title: title,
+            content: contentWithoutFrontmatter,
             date: date,
-            tags: Array.isArray(file.frontmatter && file.frontmatter.tags) ? file.frontmatter.tags : [],
-            content: contentWithoutFrontmatter
+            searchContent: searchContent
         };
+        
+        // 只有当 tags 不为空时才添加 tags 和 searchTags 字段
+        if (tags.length > 0) {
+            result.tags = tags;
+            const searchTags = tags.map(tag => tokenizeChinese(tag)).flat().join(' ');
+            result.searchTags = searchTags;
+        }
+        
+        return result;
     });
     
     fs.writeFileSync(path.join(outputDir, 'search-data.json'), JSON.stringify(searchData, null, 2));
@@ -191,16 +244,22 @@ function buildSearchData(markdownFiles) {
 function copyMainFiles() {
     console.log('\n复制主要文件...');
     
-    if (fs.existsSync('index.html')) {
-        const targetPath = path.join(DOCS_DIR, 'index.html');
-        fs.copyFileSync('index.html', targetPath);
-        console.log(`✓ 复制：index.html -> ${targetPath}`);
+    // 确保 public 目录存在
+    const PUBLIC_DIR = './public';
+    if (!fs.existsSync(PUBLIC_DIR)) {
+        fs.mkdirSync(PUBLIC_DIR, { recursive: true });
     }
     
-    if (fs.existsSync('favicon.ico')) {
-        const targetPath = path.join(DOCS_DIR, 'favicon.ico');
-        fs.copyFileSync('favicon.ico', targetPath);
-        console.log(`✓ 复制：favicon.ico -> ${targetPath}`);
+    if (fs.existsSync('src/index.html')) {
+        const targetPath = path.join(PUBLIC_DIR, 'index.html');
+        fs.copyFileSync('src/index.html', targetPath);
+        console.log(`✓ 复制：src/index.html -> ${targetPath}`);
+    }
+    
+    if (fs.existsSync('src/favicon.ico')) {
+        const targetPath = path.join(PUBLIC_DIR, 'favicon.ico');
+        fs.copyFileSync('src/favicon.ico', targetPath);
+        console.log(`✓ 复制：src/favicon.ico -> ${targetPath}`);
     }
 }
 

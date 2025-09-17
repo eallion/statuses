@@ -1,14 +1,15 @@
 {
-  "name": "minisearch-markdown-search",
+  "name": "flexsearch-markdown-search",
   "version": "1.0.0",
   "description": "轻量级 Markdown 搜索解决方案",
   "main": "index.js",
+  "private": true,
   "scripts": {
     "build": "node scripts/build.js",
     "dev": "npm run build && npm run serve",
-    "serve": "cd docs && npx http-server -p 3001 -c-1"
+    "serve": "cd public && npx http-server -p 3000 -c-1"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "MIT"
 }
