@@ -150,6 +150,15 @@
             word-break: break-all;
         }
 
+        .result-item p mark {
+            display: inline-block !important;
+            background: linear-gradient(120deg, #a8e6cf 0%, #dcedc1 100%) !important;
+            padding: 2px 4px !important;
+            border-radius: 3px !important;
+            color: #2c3e50 !important;
+            font-weight: 600 !important;
+        }
+
         .result-item .meta {
             display: flex;
             justify-content: space-between;
@@ -374,7 +383,11 @@
                 let cleanContent = result.content || '';
                 cleanContent = cleanContent.replace(/\[(.*?)\]\(.*?\)/g, '$1');
 
-                const displayContent = cleanContent.substring(0, 200) + (cleanContent.length > 200 ? '...' : '');
+                // 200 字符截断
+                // const displayContent = cleanContent.substring(0, 200) + (cleanContent.length > 200 ? '...' : '');
+
+                // 不截断，显示全文
+                const displayContent = cleanContent
                 const highlightedContent = highlightMatch(displayContent, query);
                 const cleanTags = (Array.isArray(result.tags) ? result.tags : []).map(tag => tag.replace(/['"]/g, ''));
 
