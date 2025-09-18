@@ -34,6 +34,12 @@ function parseFrontmatter(content) {
                     return;
                 }
                 
+                // 特殊处理 reply 字段，转换为布尔值
+                if (key === 'reply') {
+                    frontmatter[key] = value === 'true';
+                    return;
+                }
+                
                 // 处理 tags 字段
                 if (key === 'tags') {
                     frontmatter[key] = parseTags(value);
@@ -227,8 +233,14 @@ function buildSearchData(markdownFiles) {
     // 合并所有文件（有日期的排在前面）
     const sortedFiles = [...filesWithDate, ...filesWithoutDate];
     
-    // 生成 search-data.json
-    const searchData = sortedFiles.map((file, index) => {
+    // 分离回复和非回复内容
+    const nonReplyFiles = sortedFiles.filter(file => 
+        !file.frontmatter || file.frontmatter.reply !== true);
+    const replyFiles = sortedFiles.filter(file => 
+        file.frontmatter && file.frontmatter.reply === true);
+    
+    // 生成普通搜索数据（不包含回复）
+    const searchData = nonReplyFiles.map((file, index) => {
         // 从内容中移除 frontmatter 部分
         let contentWithoutFrontmatter = file.content;
         
@@ -288,7 +300,70 @@ function buildSearchData(markdownFiles) {
         return result;
     });
     
+    // 生成回复搜索数据
+    const replySearchData = replyFiles.map((file, index) => {
+        // 从内容中移除 frontmatter 部分
+        let contentWithoutFrontmatter = file.content;
+        
+        // 确保正确移除 frontmatter
+        if (contentWithoutFrontmatter.startsWith('---')) {
+            const frontmatterEndIndex = contentWithoutFrontmatter.indexOf('---', 3);
+            if (frontmatterEndIndex !== -1) {
+                contentWithoutFrontmatter = contentWithoutFrontmatter.substring(frontmatterEndIndex + 3).trim();
+            }
+        }
+        
+        // 移除 Markdown 格式的图片 ![]() 和 ![alt](url)
+        contentWithoutFrontmatter = contentWithoutFrontmatter.replace(/!\[.*?\]\(.*?\)/g, '');
+        
+        // 确保正确提取 title 和 date 字段
+        const title = file.frontmatter && file.frontmatter.id ? file.frontmatter.id.toString() : 
+            (file.frontmatter && file.frontmatter.title ? file.frontmatter.title : file.title);
+
+        // 优先使用 frontmatter 中的 date 字段，保持原始值
+        let date = file.frontmatter && file.frontmatter.date ? file.frontmatter.date : '';
+        
+        // 如果日期是 ISO 格式，则转换为 "Sep 06, 2025 14:39:07" 格式
+        if (date && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(date)) {
+            const dateObj = new Date(date);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = months[dateObj.getUTCMonth()];
+            const day = String(dateObj.getUTCDate()).padStart(2, '0');
+            const year = dateObj.getUTCFullYear();
+            const hours = String(dateObj.getUTCHours()).padStart(2, '0');
+            const minutes = String(dateObj.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(dateObj.getUTCSeconds()).padStart(2, '0');
+            date = `${month} ${day}, ${year} ${hours}:${minutes}:${seconds}`;
+        }
+
+        // 获取标签
+        const tags = Array.isArray(file.frontmatter && file.frontmatter.tags) ? file.frontmatter.tags : [];
+        
+        // 生成分词字段
+        const searchContent = tokenizeChinese(contentWithoutFrontmatter).join(' ');
+        
+        // 构建返回对象
+        const result = {
+            id: index,
+            title: title,
+            content: contentWithoutFrontmatter,
+            date: date,
+            searchContent: searchContent
+        };
+        
+        // 只有当 tags 不为空时才添加 tags 和 searchTags 字段
+        if (tags.length > 0) {
+            result.tags = tags;
+            const searchTags = tags.map(tag => tokenizeChinese(tag)).flat().join(' ');
+            result.searchTags = searchTags;
+        }
+        
+        return result;
+    });
+    
+    // 写入文件
     fs.writeFileSync(path.join(outputDir, 'search-data.json'), JSON.stringify(searchData, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'search-data-reply.json'), JSON.stringify(replySearchData, null, 2));
 }
 
 // 复制主页
