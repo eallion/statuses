@@ -261,6 +261,12 @@ function copyMainFiles() {
         fs.copyFileSync('src/favicon.ico', targetPath);
         console.log(`✓ 复制：src/favicon.ico -> ${targetPath}`);
     }
+    
+    if (fs.existsSync('src/robots.txt')) {
+        const targetPath = path.join(PUBLIC_DIR, 'robots.txt');
+        fs.copyFileSync('src/robots.txt', targetPath);
+        console.log(`✓ 复制：src/robots.txt -> ${targetPath}`);
+    }
 }
 
 // 主函数
