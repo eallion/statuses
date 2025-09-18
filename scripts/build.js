@@ -34,6 +34,12 @@ function parseFrontmatter(content) {
                     return;
                 }
                 
+                // 处理 tags 字段
+                if (key === 'tags') {
+                    frontmatter[key] = parseTags(value);
+                    return;
+                }
+                
                 if (value.startsWith('[') && value.endsWith(']')) {
                     value = value.slice(1, -1).split(',').map(tag => 
                         tag.trim().replace(/"/g, '')
@@ -49,6 +55,51 @@ function parseFrontmatter(content) {
     
     return { frontmatter, content: markdown };
 }
+
+// 解析 tags 的专用函数，支持多种格式
+function parseTags(tagsValue) {
+    // 去除首尾空格
+    tagsValue = tagsValue.trim();
+    
+    // 如果是数组格式 [tag1, tag2, ...]
+    if (tagsValue.startsWith('[') && tagsValue.endsWith(']')) {
+        // 移除方括号
+        tagsValue = tagsValue.slice(1, -1);
+        // 分割并清理每个 tag
+        return tagsValue.split(',')
+            .map(tag => tag.trim().replace(/^["']|["']$/g, '')) // 移除首尾的引号
+            .filter(tag => tag.length > 0); // 过滤空 tag
+    }
+    
+    // 检查是否包含逗号分隔
+    if (tagsValue.includes(',')) {
+        // 逗号分隔格式：tag1, tag2, ...
+        return tagsValue.split(',')
+            .map(tag => tag.trim().replace(/^["']|["']$/g, '')) // 移除首尾的引号
+            .filter(tag => tag.length > 0); // 过滤空 tag
+    }
+    
+    // 检查是否被引号包围的整体字符串
+    if ((tagsValue.startsWith('"') && tagsValue.endsWith('"')) || 
+        (tagsValue.startsWith("'") && tagsValue.endsWith("'"))) {
+        // 整体是一个被引号包围的字符串，尝试按空格分割
+        tagsValue = tagsValue.slice(1, -1);
+        if (tagsValue.includes(' ')) {
+            return tagsValue.split(' ')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0);
+        } else {
+            // 单个 tag
+            return [tagsValue];
+        }
+    }
+    
+    // 默认按空格分隔处理
+    return tagsValue.split(' ')
+        .map(tag => tag.trim().replace(/^["']|["']$/g, '')) // 移除首尾的引号
+        .filter(tag => tag.length > 0); // 过滤空 tag
+}
+
 
 // 递归扫描目录，获取所有 Markdown 文件
 function getAllMarkdownFiles(dir) {
