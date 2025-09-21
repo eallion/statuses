@@ -210,6 +210,16 @@ function tokenizeChinese(text) {
             for (let i = 0; i < token.length - 1; i++) {
                 result.push(token.substr(i, 2));
             }
+            
+            // 添加三字符组合
+            for (let i = 0; i < token.length - 2; i++) {
+                result.push(token.substr(i, 3));
+            }
+            
+            // 添加四字符组合
+            for (let i = 0; i < token.length - 3; i++) {
+                result.push(token.substr(i, 4));
+            }
         } else {
             // 非中文词直接添加
             result.push(token);

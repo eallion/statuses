@@ -397,56 +397,6 @@
             });
         }
 
-        // 监听"包含回复"复选框变化
-        document.getElementById('includeReplies').addEventListener('change', async function() {
-            const wasIncludeReplies = includeReplies;
-            includeReplies = this.checked;
-            
-            // 如果勾选了"包含回复"且回复数据尚未加载，则加载回复数据
-            if (includeReplies && !replyDataLoaded) {
-                await loadReplyData();
-                // 加载完成后立即执行一次搜索
-                performSearch();
-            } else if (wasIncludeReplies !== includeReplies) {
-                // 如果是取消勾选，也需要重新搜索
-                performSearch();
-            }
-        });
-
-        // 加载回复数据
-        async function loadReplyData() {
-            try {
-                const replyResponse = await fetch('./search-data-reply.json');
-                const replyDocuments = await replyResponse.json();
-
-                replySearchIndex = new FlexSearch.Document({
-                    id: "id",
-                    index: ["searchContent", "searchTags"],
-                    store: true,
-                    tokenize: "split"
-                });
-
-                replyDocuments.forEach((doc, index) => {
-                    if (doc && (doc.id !== undefined)) {
-                        replySearchIndex.add({
-                            id: index, // 使用索引作为 ID
-                            title: doc.title || "",
-                            content: doc.content || "",
-                            date: doc.date || "",
-                            tags: doc.tags || [],
-                            searchContent: doc.searchContent || "",
-                            searchTags: doc.searchTags || ""
-                        });
-                    }
-                });
-                
-                replyDataLoaded = true;
-                // console.log('回复数据加载完成');
-            } catch (error) {
-                console.error('回复数据加载失败：', error);
-            }
-        }
-
         async function initializeSearch() {
             try {
                 const response = await fetch('./search-data.json');
@@ -454,9 +404,17 @@
 
                 flexSearchIndex = new FlexSearch.Document({
                     id: "id",
-                    index: ["searchContent", "searchTags"],
+                    index: ["content", "searchContent", "searchTags"],
                     store: true,
-                    tokenize: "split"
+                    tokenize: "forward",
+                    optimize: true,
+                    resolution: 9,
+                    context: {
+                        depth: 2,
+                        bidirectional: true
+                    },
+                    filter: ["content"],
+                    matcher: "simple" // 添加简单匹配器以支持子字符串搜索
                 });
 
                 documents.forEach(doc => {
@@ -481,6 +439,64 @@
             } catch (error) {
                 console.error('搜索初始化失败：', error);
                 document.getElementById('results').innerHTML = '<div class="no-results">搜索功能初始化失败，请检查控制台错误。</div>';
+            }
+        }
+
+        // 监听"包含回复"复选框变化
+        document.getElementById('includeReplies').addEventListener('change', async function() {
+            const wasIncludeReplies = includeReplies;
+            includeReplies = this.checked;
+            
+            // 如果勾选了"包含回复"且回复数据尚未加载，则加载回复数据
+            if (includeReplies && !replyDataLoaded) {
+                await loadReplyData();
+                // 加载完成后立即执行一次搜索
+                performSearch();
+            } else if (wasIncludeReplies !== includeReplies) {
+                // 如果是取消勾选，也需要重新搜索
+                performSearch();
+            }
+        });
+
+        // 加载回复数据
+        async function loadReplyData() {
+            try {
+                const replyResponse = await fetch('./search-data-reply.json');
+                const replyDocuments = await replyResponse.json();
+
+                replySearchIndex = new FlexSearch.Document({
+                    id: "id",
+                    index: ["content", "searchContent", "searchTags"],
+                    store: true,
+                    tokenize: "forward",
+                    optimize: true,
+                    resolution: 9,
+                    context: {
+                        depth: 2,
+                        bidirectional: true
+                    },
+                    filter: ["content"],
+                    matcher: "simple" // 添加简单匹配器以支持子字符串搜索
+                });
+
+                replyDocuments.forEach((doc, index) => {
+                    if (doc && (doc.id !== undefined)) {
+                        replySearchIndex.add({
+                            id: doc.id,
+                            title: doc.title || "",
+                            content: doc.content || "",
+                            date: doc.date || "",
+                            tags: doc.tags || [],
+                            searchContent: doc.searchContent || "",
+                            searchTags: doc.searchTags || ""
+                        });
+                    }
+                });
+                
+                replyDataLoaded = true;
+                // console.log('回复数据加载完成');
+            } catch (error) {
+                console.error('回复数据加载失败：', error);
             }
         }
 
@@ -531,27 +547,69 @@
             }
 
             try {
-                // 搜索主内容
-                const searchResults = flexSearchIndex.search(query, { limit: 100 });
+                // 搜索主内容 - 分别对不同字段使用不同的搜索方式
+                const contentResults = flexSearchIndex.search(query, {
+                    index: "content",
+                    limit: 100,
+                    suggest: true // 启用建议模式以支持子字符串匹配
+                });
+                
+                const searchContentResults = flexSearchIndex.search(query, {
+                    index: "searchContent",
+                    limit: 100
+                });
+                
+                const searchTagsResults = flexSearchIndex.search(query, {
+                    index: "searchTags",
+                    limit: 100
+                });
                 
                 // 如果包含回复，也搜索回复内容
-                let replyResults = [];
+                let replyContentResults = [];
+                let replySearchContentResults = [];
+                let replySearchTagsResults = [];
+                
                 if (includeReplies && replySearchIndex) {
-                    replyResults = replySearchIndex.search(query, { limit: 100 });
+                    replyContentResults = replySearchIndex.search(query, {
+                        index: "content",
+                        limit: 100,
+                        suggest: true // 启用建议模式以支持子字符串匹配
+                    });
+                    
+                    replySearchContentResults = replySearchIndex.search(query, {
+                        index: "searchContent",
+                        limit: 100
+                    });
+                    
+                    replySearchTagsResults = replySearchIndex.search(query, {
+                        index: "searchTags",
+                        limit: 100
+                    });
                 }
                 
                 // 收集所有唯一 ID
                 const uniqueIds = new Set();
-                searchResults.forEach(fieldResult => {
-                    if (fieldResult && fieldResult.result) {
-                        fieldResult.result.forEach(id => uniqueIds.add(`main-${id}`));
+                
+                // 处理主索引结果
+                [contentResults, searchContentResults, searchTagsResults].forEach(resultArray => {
+                    if (resultArray && resultArray.length > 0) {
+                        resultArray.forEach(fieldResult => {
+                            if (fieldResult && fieldResult.result) {
+                                fieldResult.result.forEach(id => uniqueIds.add(`main-${id}`));
+                            }
+                        });
                     }
                 });
                 
+                // 处理回复索引结果
                 if (includeReplies && replySearchIndex) {
-                    replyResults.forEach(fieldResult => {
-                        if (fieldResult && fieldResult.result) {
-                            fieldResult.result.forEach(id => uniqueIds.add(`reply-${id}`));
+                    [replyContentResults, replySearchContentResults, replySearchTagsResults].forEach(resultArray => {
+                        if (resultArray && resultArray.length > 0) {
+                            resultArray.forEach(fieldResult => {
+                                if (fieldResult && fieldResult.result) {
+                                    fieldResult.result.forEach(id => uniqueIds.add(`reply-${id}`));
+                                }
+                            });
                         }
                     });
                 }
