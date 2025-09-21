@@ -372,8 +372,8 @@ function buildSearchData(markdownFiles) {
     });
     
     // 写入文件
-    fs.writeFileSync(path.join(outputDir, 'search-data.json'), JSON.stringify(searchData, null, 2));
-    fs.writeFileSync(path.join(outputDir, 'search-data-reply.json'), JSON.stringify(replySearchData, null, 2));
+    fs.writeFileSync(path.join(outputDir, 'search-data.json'), JSON.stringify(searchData, null, 0));
+    fs.writeFileSync(path.join(outputDir, 'search-data-reply.json'), JSON.stringify(replySearchData, null, 0));
 }
 
 // 复制主页
