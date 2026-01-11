@@ -5,6 +5,9 @@ const path = require('path');
 const CONTENT_DIR = './content';
 const DOCS_DIR = './public';
 
+// 读取环境变量，默认密码
+const SEARCH_PASSWORD = process.env.SEARCH_PASSWORD || 'eallion';
+
 // 确保 public 目录存在
 if (!fs.existsSync(DOCS_DIR)) {
     fs.mkdirSync(DOCS_DIR, { recursive: true });
@@ -388,8 +391,11 @@ function copyMainFiles() {
     
     if (fs.existsSync('src/index.html')) {
         const targetPath = path.join(PUBLIC_DIR, 'index.html');
-        fs.copyFileSync('src/index.html', targetPath);
+        let content = fs.readFileSync('src/index.html', 'utf-8');
+        content = content.replace(/%%SEARCH_PASSWORD%%/g, SEARCH_PASSWORD);
+        fs.writeFileSync(targetPath, content);
         console.log(`✓ 复制：src/index.html -> ${targetPath}`);
+        console.log(`✓ 注入密码：${SEARCH_PASSWORD}`);
     }
     
     if (fs.existsSync('src/favicon.ico')) {
