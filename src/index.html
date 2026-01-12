@@ -370,10 +370,12 @@
         let includeReplies = false;
         let replyDataLoaded = false;
         let isAuthenticated = false;
+        let turnstileVerified = false;
         
         const AUTH_PASSWORD = '%%SEARCH_PASSWORD%%';
         const AUTH_STORAGE_KEY = 'auth_token';
         const AUTH_EXPIRY_KEY = 'auth_expiry';
+        const TURNSTILE_STORAGE_KEY = 'turnstile_verified';
         const AUTH_DURATION = 24 * 60 * 60 * 1000;
 
         // Check for Web Speech API support
@@ -389,7 +391,22 @@
         function checkAuth() {
             const token = localStorage.getItem(AUTH_STORAGE_KEY);
             const expiry = localStorage.getItem(AUTH_EXPIRY_KEY);
+            const turnstileToken = localStorage.getItem(TURNSTILE_STORAGE_KEY);
             
+            // 检查 Turnstile 验证状态
+            if (turnstileToken) {
+                const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+                if (turnstileResponse && turnstileResponse.value) {
+                    turnstileVerified = true;
+                } else {
+                    turnstileVerified = false;
+                    localStorage.removeItem(TURNSTILE_STORAGE_KEY);
+                }
+            } else {
+                turnstileVerified = false;
+            }
+            
+            // 检查密码认证状态
             if (token && expiry && Date.now() < parseInt(expiry)) {
                 isAuthenticated = token === AUTH_PASSWORD;
             } else {
@@ -410,6 +427,17 @@
                 authError.classList.add('hidden');
                 passwordInput.value = '';
                 updateAuthUI();
+                
+                // 验证通过后检查是否有 URL 参数需要搜索
+                const urlParams = new URLSearchParams(window.location.search);
+                const query = urlParams.get('q');
+                if (query) {
+                    // 检查 Turnstile 验证是否仍然有效
+                    const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+                    if (turnstileResponse && turnstileResponse.value) {
+                        performSearch();
+                    }
+                }
             } else {
                 authError.textContent = '密码错误，请重试';
                 authError.classList.remove('hidden');
@@ -424,11 +452,16 @@
             
             if (isAuthenticated) {
                 authContainer.classList.add('hidden');
-                turnstileContainer.classList.remove('hidden');
-            } else {
-                authContainer.classList.remove('hidden');
-                searchBox.classList.add('hidden');
                 turnstileContainer.classList.add('hidden');
+                searchBox.classList.remove('hidden');
+            } else if (turnstileVerified) {
+                authContainer.classList.remove('hidden');
+                turnstileContainer.classList.add('hidden');
+                searchBox.classList.add('hidden');
+            } else {
+                authContainer.classList.add('hidden');
+                searchBox.classList.add('hidden');
+                turnstileContainer.classList.remove('hidden');
             }
         }
 
@@ -624,10 +657,7 @@
             const query = urlParams.get('q');
             if (query) {
                 document.getElementById('searchInput').value = decodeURIComponent(query);
-                const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
-                if (turnstileResponse && turnstileResponse.value) {
-                    performSearch();
-                }
+                performSearch();
             }
         }
 
@@ -656,12 +686,7 @@
             // 更新 URL 参数
             updateUrlParam(query, false);
 
-            // 检查 Turnstile 验证
-            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
-            if (!turnstileResponse || !turnstileResponse.value) {
-                document.getElementById('results').innerHTML = '<div class="no-results">请完成验证码验证</div>';
-                return;
-            }
+            // Turnstile 验证在密码认证前已完成，无需再次检查
 
             try {
                 // 搜索主内容 - 分别对不同字段使用不同的搜索方式
@@ -751,13 +776,7 @@
                 processedResults.sort((a, b) => (parseCustomDate(b.date) || 0) - (parseCustomDate(a.date) || 0));
                 displayResults(processedResults, query);
 
-                // 验证成功后隐藏验证码并显示搜索框
-                const turnstileContainer = document.querySelector('.cf-turnstile');
-                const searchBox = document.getElementById('searchBox');
-                if (turnstileContainer && searchBox) {
-                    turnstileContainer.classList.add('hidden');
-                    searchBox.classList.remove('hidden');
-                }
+                // 密码认证成功后搜索框已显示，无需额外操作
             } catch (error) {
                 console.error('搜索出错：', error);
                 document.getElementById('results').innerHTML = '<div class="no-results">搜索出错，请重试</div>';
@@ -825,6 +844,16 @@
             searchTimeout = setTimeout(performSearch, 300);
         });
 
+        // 页面加载时检查 Turnstile 验证状态
+        function checkTurnstileStatus() {
+            const turnstileResponse = document.querySelector('[name="cf-turnstile-response"]');
+            if (turnstileResponse && turnstileResponse.value) {
+                turnstileVerified = true;
+                localStorage.setItem(TURNSTILE_STORAGE_KEY, 'true');
+                updateAuthUI();
+            }
+        }
+
         checkAuth();
         initializeSearch();
         
@@ -837,24 +866,20 @@
         defer></script>
     <script>
         function onloadTurnstileCallback() {
-            // Turnstile 加载完成后执行的回调
-            // console.log('Turnstile loaded');
+            // Turnstile 加载完成后检查验证状态
+            setTimeout(checkTurnstileStatus, 100);
         }
 
         // 添加验证成功回调
         function onTurnstileSuccess() {
-            const searchBox = document.getElementById('searchBox');
+            turnstileVerified = true;
+            localStorage.setItem(TURNSTILE_STORAGE_KEY, 'true');
+            
+            const authContainer = document.getElementById('authContainer');
             const turnstileContainer = document.querySelector('.cf-turnstile');
-            if (searchBox && turnstileContainer) {
-                searchBox.classList.remove('hidden');
+            if (authContainer && turnstileContainer) {
+                authContainer.classList.remove('hidden');
                 turnstileContainer.classList.add('hidden');
-                
-                // 验证通过后检查是否有 URL 参数需要搜索
-                const urlParams = new URLSearchParams(window.location.search);
-                const query = urlParams.get('q');
-                if (query) {
-                    performSearch();
-                }
             }
         }
     </script>
