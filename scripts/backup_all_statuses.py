@@ -7,8 +7,12 @@ import html2text
 MASTODON_INSTANCE = "" # 替换为你的 Mastodon 实例域名
 ACCOUNT_ID = "" # 替换为你的账户 ID
 BACKUP_DIR = "content"  # content 目录
-INCLUDE_REPLIES = True  # 是否包含回复
-INCLUDE_REBLOGS = True  # 是否包含转嘟
+EXCLUDE_REPLIES = False  # 是否排除回复
+EXCLUDE_REBLOGS = False  # 是否排除转嘟
+MAX_ID = ""  # 可选：往历史方向获取，获取 ID 小于此值的动态（用于向下翻页）
+MIN_ID = ""  # 可选：从此处开始往最新方向获取，获取 ID 大于此值的动态（注意：max_id 和 min_id 互斥，不能同时填入）
+PINNED = False  # 是否仅获取置顶动态
+LIMIT = 40  # 每页限制数量，默认为 40
 
 API_BASE_URL = f"https://{MASTODON_INSTANCE}/api/v1/accounts/{ACCOUNT_ID}/statuses"
 
@@ -57,9 +61,26 @@ def backup_statuses():
     """
     备份符合条件的 Mastodon 动态为 Markdown 文件。
     """
-    # 根据配置决定是否排除转嘟
-    exclude_reblogs_param = "false" if INCLUDE_REBLOGS else "true"
-    next_url = f"{API_BASE_URL}?limit=40&exclude_reblogs={exclude_reblogs_param}"
+    # 检查 max_id 和 min_id 是否同时被设置
+    if MAX_ID and MIN_ID:
+        print("错误：max_id 和 min_id 不能同时填入，请只填一个。")
+        print("- max_id: 往历史方向获取（向下翻页）")
+        print("- min_id: 从此处往最新方向获取（向上翻页）")
+        return
+    
+    # 根据配置构建 URL 参数
+    exclude_reblogs_param = "true" if EXCLUDE_REBLOGS else "false"
+    exclude_replies_param = "true" if EXCLUDE_REPLIES else "false"
+    pinned_param = "true" if PINNED else "false"
+    
+    # 构建 URL 参数
+    params = f"limit={LIMIT}&exclude_reblogs={exclude_reblogs_param}&exclude_replies={exclude_replies_param}&pinned={pinned_param}"
+    if MAX_ID:
+        params += f"&max_id={MAX_ID}"
+    if MIN_ID:
+        params += f"&min_id={MIN_ID}"
+    
+    next_url = f"{API_BASE_URL}?{params}"
     processed_count = 0
 
     while next_url:
@@ -75,17 +96,17 @@ def backup_statuses():
             for status in statuses:
                 # 根据配置决定是否过滤转嘟
                 is_reblog = status.get('reblog') is not None
-                if not INCLUDE_REBLOGS and is_reblog:
+                if EXCLUDE_REBLOGS and is_reblog:
                     continue
 
                 # 根据配置决定是否过滤回复
                 is_reply = status.get('in_reply_to_id') is not None
-                if not INCLUDE_REPLIES and is_reply:
+                if EXCLUDE_REPLIES and is_reply:
                     continue
 
                 # 如果是回复，但不是回复给自己，根据配置决定是否过滤
                 if is_reply and status.get('in_reply_to_account_id') != ACCOUNT_ID:
-                    if not INCLUDE_REPLIES:
+                    if EXCLUDE_REPLIES:
                         continue
 
                 # 获取日期信息，用于创建目录
@@ -120,6 +141,14 @@ def backup_statuses():
                 for link in links:
                     if 'rel="next"' in link:
                         next_url = link.split(';')[0].strip('<> ')
+                        # 如果使用了 min_id，需要更新 min_id 而不是使用 API 返回的 max_id
+                        # 从返回的最后一个 status 中提取最新的 ID 作为下一次的 min_id
+                        if MIN_ID and statuses:
+                            last_status_id = statuses[-1]['id']
+                            # 重新构建包含更新的 min_id 的参数
+                            base_params = f"limit={LIMIT}&exclude_reblogs={exclude_reblogs_param}&exclude_replies={exclude_replies_param}&pinned={pinned_param}"
+                            next_url = f"{API_BASE_URL}?{base_params}&min_id={last_status_id}"
+                        # 如果使用了 max_id，直接使用 API 返回的 Link header 中的 next_url（已包含正确的 max_id）
                         
         except requests.exceptions.RequestException as e:
             print(f"请求出错：{e}")
